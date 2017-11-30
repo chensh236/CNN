@@ -28,7 +28,7 @@ class ImageDataGenerator:
                                [-1, 2, -2, 2, -1]], np.float32)/12
 
             for l in lines:
-                items = l.split()
+                items = l.split("_")
                 mytestImage = tf.image.decode_jpeg(items[0])
                 print mytestImage
                 # load images

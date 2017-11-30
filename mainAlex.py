@@ -11,8 +11,8 @@ val_file = 'data/val.txt'
 
 # Learning params
 learning_rate = 0.01
-num_epochs = 10
-batch_size = 1
+num_epochs = 100
+batch_size = 128
 
 # Network params
 dropout_rate = 0.5
