@@ -7,35 +7,35 @@ from datetime import datetime
 from alexnet_model import AlexNet
 from read_image import DataGenerator
 
-train_file = 'H:\\shuqian\\image\\train\\'
-val_file = 'H:\\shuqian\\image\\val\\'
+train_file = 'H:\\shuqian\\luca\\image\\train\\'
+val_file = 'H:\\shuqian\\luca\\image\\val\\'
 
 # Learning params
-learning_rate = 0.0001
-num_epochs = 400
-batch_size = 100
+learning_rate = 0.0015
+num_epochs = 4000
+batch_size = 128
+weight_decay_rate = 0.0075
 
 # Network params
-dropout_rate = 0.5
-num_classes = 3
+num_classes = 5
 
 # How often we want to write the tf.summary data to disk
-display_step = 80
+display_step = 100
 
 # Path for tf.summary.FileWriter and to store model checkpoints
-filewriter_path = "\\\\tsclient\\CNN\\graph"
-checkpoint_path = "H:\\shuqian\\checkpoints"
+filewriter_path = "H:\\shuqian\\luca\\code\\graph"
+checkpoint_path = "H:\\shuqian\\luca\\code\\checkpoints"
 
 # TF placeholder for graph input and output
-x = tf.placeholder(tf.float32, [batch_size, 252, 252, 3], name = 'x_images')
+x = tf.placeholder(tf.float32, [batch_size, 64, 64, 3], name = 'x_images')
 y = tf.placeholder(tf.float32, [batch_size, num_classes], name = 'y_labels')
-keep_prob = tf.placeholder(tf.float32, name = 'prob_rate')
 
 # Initialize model
-model = AlexNet(x, keep_prob, num_classes)
+model = AlexNet(x, num_classes)
 
 # Link variable to model output
-score = model.fc7
+score = model.fc3
+pre = model.pre
 
 # List of trainable variables of the layers we want to train
 var_list = tf.trainable_variables()
@@ -43,8 +43,11 @@ var_list = tf.trainable_variables()
 # Op for calculating the loss
 with tf.name_scope("cross_ent"):
   loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = score, labels = y))
-  # loss = tf.reduce_mean(-tf.reduce_sum(y*tf.log(score), reduction_indices=1))
-  # loss = tf.reduce_sum(tf.square(tf.subtract(score, y)))
+  costs = []
+  for var in var_list:
+    if var.op.name.find(r'weights') > 0:
+      costs.append(tf.nn.l2_loss(var))
+  loss += tf.multiply(weight_decay_rate, tf.add_n(costs))
 
 # Train op
 with tf.name_scope("train"):
@@ -53,8 +56,7 @@ with tf.name_scope("train"):
   gradients = list(zip(gradients, var_list))
 
   # Create optimizer and apply gradient descent to the trainable variables
-  optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss)
-  # train_op = optimizer.apply_gradients(grads_and_vars=gradients)
+  optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum = 0.9).minimize(loss)
 
 # Add gradients to summary
 for gradient, var in gradients:
@@ -69,7 +71,7 @@ tf.summary.scalar('cross_entropy', loss)
 
 # Evaluation op: Accuracy of the model
 with tf.name_scope("accuracy"):
-  correct_pred = tf.equal(tf.argmax(score, 1), tf.argmax(y, 1))
+  correct_pred = tf.equal(tf.argmax(pre, 1), tf.argmax(y, 1))
   accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 # Add the accuracy to the summary
@@ -79,8 +81,8 @@ tf.summary.scalar('accuracy', accuracy)
 merged_summary = tf.summary.merge_all()
 
 # Initialize the FileWriter
-train_writer = tf.summary.FileWriter("H:\\shuqian\\graph\\train")
-test_writer = tf.summary.FileWriter("H:\\shuqian\\graph\\test")
+train_writer = tf.summary.FileWriter("H:\\shuqian\\luca\\code\\graph\\train")
+test_writer = tf.summary.FileWriter("H:\\shuqian\\luca\\code\\graph\\test")
 
 # Initialize an saver for store model checkpoints
 saver = tf.train.Saver()
@@ -95,7 +97,7 @@ val_batches_per_epoch = np.floor(val_generator.data_size / batch_size).astype(np
 
 with tf.device('/gpu:0'):
     # Start Tensorflow session
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
+    with tf.Session() as sess:
 
         # Initialize all variables
         sess.run([tf.global_variables_initializer(), tf.local_variables_initializer()])
@@ -112,7 +114,7 @@ with tf.device('/gpu:0'):
         # Loop over number of epochs
         for epoch in range(num_epochs):
             print("{} Epoch number: {}".format(datetime.now(), epoch+1))
-            if epoch % 50 == 0:
+            if epoch % 10 == 0:
                 learning_rate = learning_rate / 2
             step = 1
             train_acc = 0.
@@ -121,15 +123,13 @@ with tf.device('/gpu:0'):
                 # And run the training op
                 images, labels = sess.run([train_generator.images, train_generator.labels])
                 op, acc = sess.run([optimizer, accuracy], feed_dict={x: images,
-                                              y: labels,
-                                              keep_prob: dropout_rate})
+                                              y: labels})
                 train_acc += acc
                 train_count += 1
                 # Generate summary with the current batch of data and write to file
                 if step % display_step == 0:
                     s = sess.run(merged_summary, feed_dict={x: images,
-                                                        y: labels,
-                                                        keep_prob: 1.})
+                                                        y: labels})
                     train_writer.add_summary(s, epoch*train_batches_per_epoch + step)
                 step += 1
             train_acc /= train_count
@@ -143,15 +143,13 @@ with tf.device('/gpu:0'):
             while step < val_batches_per_epoch:
                 val_images, val_labels = sess.run([val_generator.images, val_generator.labels])
                 acc = sess.run(accuracy, feed_dict={x: val_images,
-                                                    y: val_labels,
-                                                    keep_prob: 1.})
+                                                    y: val_labels})
                 test_acc += acc
                 test_count += 1
                 # Generate summary with the current batch of data and write to file
-                if step % (display_step/2) == 0:
+                if step % 100 == 0:
                     s = sess.run(merged_summary, feed_dict={x: val_images,
-                                                        y: val_labels,
-                                                        keep_prob: 1.})
+                                                        y: val_labels})
                     test_writer.add_summary(s, epoch*val_batches_per_epoch + step)
                 step += 1
             test_acc /= test_count

@@ -7,16 +7,22 @@ import numpy as np
 
 class DataGenerator:
     def __init__(self, filepath, mode, batch_size, num_classes):
-        self.write_to_tfrecord(filepath, mode)
+        #self.write_to_tfrecord(filepath, mode)
+        if mode == 'train':
+            self.data_size = 60379
+        else:
+            self.data_size = 15177
         self.read_from_tfrecord(batch_size, num_classes, mode)
 
 
     def write_to_tfrecord(self, filepath, mode):
-        # filepath ='H:\\shuqian\\image\\train\\'
+      with tf.name_scope("write_image"):
         # 设定类别
         classes={'Kodak_M1063':0,
                  'Casio_EX-Z150':1,
-                 'Nikon_CoolPixS710':2}
+                 'Nikon_CoolPixS710':2,
+                 'Olympus_mju_1050SW':3,
+                 'Pentax_OptioA40':4}
         #存放图片个数
         bestnum = 1000
         #第几个图片
@@ -24,7 +30,7 @@ class DataGenerator:
         #第几个TFRecord文件
         recordfilenum = 0
         #tfrecords格式文件名
-        tf_filepath = 'H:\\shuqian\\tfrecord\\'
+        tf_filepath = 'H:\\shuqian\\luca\\code\\5_tfrecord\\'
         if mode == 'train':
             ftrecordfilename = ('train_image.tfrecords_%.2d' % recordfilenum)
         else:
@@ -60,12 +66,14 @@ class DataGenerator:
 
         writer.close()
         self.data_size = recordfilenum*bestnum + num
+        print (mode, self.data_size)
 
     def read_from_tfrecord(self, batch_size, num_classes, mode):
+      with tf.name_scope("read_image"):
         if mode == 'train':
-            files = tf.train.match_filenames_once('H:\\shuqian\\tfrecord\\train_image.tfrecords*')
+            files = tf.train.match_filenames_once('H:\\shuqian\\luca\\code\\5_tfrecord\\train_image.tfrecords*')
         else:
-            files = tf.train.match_filenames_once('H:\\shuqian\\tfrecord\\test_image.tfrecords*')
+            files = tf.train.match_filenames_once('H:\\shuqian\\luca\\code\\5_tfrecord\\test_image.tfrecords*')
         filename_queue = tf.train.string_input_producer(files, shuffle=True) #读入流中
         reader = tf.TFRecordReader()
         _, serialized_example = reader.read(filename_queue)   #返回文件名和文件
@@ -76,26 +84,29 @@ class DataGenerator:
                                        })  #取出包含image和label的feature对象
         #tf.decode_raw可以将字符串解析成图像对应的像素数组
         image = tf.decode_raw(features['img_raw'], tf.uint8)
-        image = tf.reshape(image, [252,252,3])
+        image = tf.reshape(image, [64,64,3])
         image = tf.cast(image, tf.float32)
         image = tf.image.per_image_standardization(image)
         label = tf.cast(features['label'], tf.int32)
         if mode == 'train':
             example_queue = tf.RandomShuffleQueue(
                 # 队列容量
-                capacity = 16 * batch_size,
+                capacity = 100 * batch_size,
                 # 队列数据的最小容许量
-                min_after_dequeue = 8 * batch_size,
+                min_after_dequeue =  10* batch_size,
                 dtypes = [tf.float32, tf.int32],
                 # 图片数据尺寸，标签尺寸
-                shapes = [[252, 252, 3], ()])
+                shapes = [[64, 64, 3], ()])
             # 读线程的数量
             num_threads = 16
         else:
-            example_queue = tf.FIFOQueue(
-                3 * batch_size,
+            example_queue = tf.RandomShuffleQueue(
+                # 队列容量
+                capacity = 40 * batch_size,
+                # 队列数据的最小容许量
+                min_after_dequeue = 4 * batch_size,
                 dtypes=[tf.float32, tf.int32],
-                shapes=[[252, 252, 3], ()])
+                shapes=[[64, 64, 3], ()])
             # 读线程的数量
             num_threads = 1
         # 数据入队操作
@@ -126,7 +137,5 @@ class DataGenerator:
         assert labels.get_shape()[0] == batch_size
         assert labels.get_shape()[1] == num_classes
 
-        # 添加图片总结
-        tf.summary.image('images', images)
         self.images = images
         self.labels = labels
