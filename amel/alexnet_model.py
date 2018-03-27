@@ -14,29 +14,6 @@ class AlexNet(object):
     self.create()
 
   def create(self):
-    conv1 = conv(self.X, 7, 7, 64, 2, 2, name = 'conv1')
-    conv2 = conv(conv1, 7, 7, 96, 2, 2, name = 'conv2')
-    conv3 = conv(conv2, 3, 3, 96, 1, 1, name = 'conv3')
-    conv4 = conv(conv3, 3, 3, 96, 1, 1, name = 'conv4')
-    pool1 = max_pool(conv4, 3, 3, 2, 2, padding = 'VALID', name = 'pool1')
-    # conv4 = conv(pool1, 3, 3, 256, 2, 2, name = 'conv4')
-    conv5 = conv(pool1, 3, 3, 256, 1, 1, name = 'conv5')
-    conv6 = conv(conv5, 1, 1, 256, 1, 1, name = 'conv6')
-    conv7 = conv(conv6, 1, 1, 256, 1, 1, name = 'conv7')
-    pool2 = max_pool(conv7, 3, 3, 2, 2, padding = 'VALID', name = 'pool2')
-    conv8 = conv(pool2, 3, 3, 512, 1, 1, name = 'conv8')
-    conv9 = conv(conv8, 1, 1, 512, 1, 1, name = 'conv9')
-    conv10 = conv(conv9, 1, 1, 512, 1, 1, name = 'conv10')
-    pool3 = max_pool(conv10, 3, 3, 2, 2, padding = 'VALID', name = 'pool3')
-    conv11 = conv(pool3, 3, 3, 768, 1, 1, name = 'conv11')
-    conv12 = conv(conv11, 1, 1, 768, 1, 1, name = 'conv12')
-    conv13 = conv(conv12, 1, 1, 768, 1, 1, name = 'conv13')
-    conv14 = conv(conv13, 1, 1, self.NUM_CLASSES, 1, 1, name = 'conv14')
-    result = avg_pool(conv14, 7, 7, 1, 1,padding = 'VALID', name = 'result')
-    self.fc3 = tf.reshape(result, [-1, 1*1*self.NUM_CLASSES], name = 'fc3')
-    self.pre = tf.nn.softmax(self.fc3)
-
-  def create_(self):
 
     # 1st Layer: Conv (ReLu) -> pooling
     conv1 = conv(self.X, 3, 3, 64, 2, 2, name = 'conv1')
@@ -74,7 +51,7 @@ def conv(x, filter_height, filter_width, num_filters, stride_y, stride_x, name, 
                             input_channels, num_filters], dtype=tf.float32, name='weights',
                             initializer=tf.contrib.layers.xavier_initializer(), trainable = True)
         biases = tf.get_variable(shape=[num_filters], dtype=tf.float32, initializer=tf.constant_initializer(0),
-		                    trainable = True, name='biases')
+                            trainable = True, name='biases')
         conv = convolve(x, kernel)
         bias = tf.nn.bias_add(conv, biases)
         conv_ = tf.nn.relu(bias, name=name)
